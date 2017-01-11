@@ -1,0 +1,19 @@
+# Composer
+composer.lock
+/vendor/
+
+# PHPUnit
+phpunit.xml
+phpunit.xml.dist
+/tmp/
+
+# phpDocumentor
+/output/
+
+# examples
+/examples/cache/
+
+# Misc.
+_commands.txt
+_project.txt
+index.html
