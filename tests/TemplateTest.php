@@ -7,7 +7,13 @@ use AirTemplate\Template;
 if (!defined('n')) define('n', "\n");
 if (!defined('br')) define('br', "<br>");
 
-class TemplateTest extends TestCase
+class DataObj {
+	public $var1 = 'hello';
+	public $var2 = 'world';
+}
+
+
+class TemplateTest extends PHPUnit_Framework_TestCase
 {
 
 	public function testParse()
@@ -83,14 +89,30 @@ class TemplateTest extends TestCase
 		$this->assertEquals('<b>', $parsed_3['test-1'][0]);
 		$this->assertEquals('var1', $parsed_3['test-1'][1][0]);
 		$this->assertEquals('</b>', $parsed_3['test-1'][2]);
-
 	}
 
+	public function testParseExceptionSetTemplates()
+    {
+		$this->setExpectedException(InvalidArgumentException::class);
 
-	public function testRender()
+		$engine = new Template;
+
+		// test wrong argument type
+		$engine->setTemplates('');
+    }
+
+	public function testParseExceptionSetParsedTemplates()
+    {
+		$this->setExpectedException(InvalidArgumentException::class);
+
+		$engine = new Template;
+
+		// test wrong argument type
+		$engine->setParsedTemplates('');
+    }
+
+	public function testRenderArray()
 	{
-
-
 		$templates = array(
 			'test-1' => '<b>{{var1}} {{var1}}</b>',
 			'test-2' => '<b>{{var1}} {{var2}}</b>',
@@ -117,7 +139,7 @@ class TemplateTest extends TestCase
 				[ 'var1' => 'hello', 'var2' => 'world' ]
 			)
 		);
-		// arguments 1, 2 + 3 (options): apply built-in htmlspecialchars()
+		// arguments 1, 2 + 3 (options): apply htmlspecialchars
 		$this->assertEquals(
 			'<b>a&amp;b</b>',
 			$engine->render(
@@ -126,7 +148,7 @@ class TemplateTest extends TestCase
 				[ 'var1' => 'htmlspecialchars' ]
 			)
 		);
-		// arguments 1, 2 + 3 (options): apply built-in htmlspecialchars()
+		// arguments 1, 2 + 3 (options): apply htmlspecialchars with param
 		$this->assertEquals(
 			'<b>a&amp;b</b>',
 			$engine->render(
@@ -134,31 +156,12 @@ class TemplateTest extends TestCase
 				[ 'var1' => 'a&b' ],
 				[ 'var1' =>
 					[
-						['htmlspecialchars', '{value}', ENT_HTML5]
+						['htmlspecialchars', Template::FIELD_VALUE, ENT_HTML5]
 					]
 				]
 			)
 		);
-		// arguments 1, 2 + 3 (options): apply built-in urlencode()
-		$this->assertEquals(
-			'foo+%40%2B%25%2F',
-			$engine->render(
-				'test-4',
-				[ 'var1' => 'foo @+%/' ],
-				[ 'var1' => 'urlencode' ]
-			)
-		);
-		// arguments 1, 2 + 3 (options): apply built-in urlencode()
-		$this->assertEquals(
-			'foo%20%40%2B%25%2F',
-			$engine->render(
-				'test-4',
-				[ 'var1' => 'foo @+%/' ],
-				[ 'var1' => 'rawurlencode' ]
-			)
-		);
 		// arguments 1, 2 + 3 (options): apply sprintf
-		//$value = '{value}';
 		$this->assertEquals(
 			'<b>  abc</b>',
 			$engine->render(
@@ -171,19 +174,20 @@ class TemplateTest extends TestCase
 				]
 			)
 		);
-		// arguments 1, 2 + 3 (options): apply sprintf and htmlspecialchars result
+		// arguments 1, 2 + 3 (options): apply sprintf (wildcard)
 		$this->assertEquals(
-			'<b>& 3.141593</b>',
+			'<b>  abc</b>',
 			$engine->render(
 				'test-3',
-				[ 'var1' => pi() ],
-				[ 'var1' =>
+				[ 'var1' => 'abc' ],
+				[ '*' =>
 					[
-						['sprintf', '& %1.6f', '{value}']
+						['sprintf', '%5s', Template::FIELD_VALUE]
 					]
 				]
 			)
 		);
+		// arguments 1, 2 + 3 (options): apply 2 options
 		$this->assertEquals(
 			'<b>&amp; 3.141593</b>',
 			$engine->render(
@@ -191,13 +195,13 @@ class TemplateTest extends TestCase
 				[ 'var1' => pi() ],
 				[ 'var1' =>
 					[
-						['sprintf', '& %1.6f', '{value}'],
+						['sprintf', '& %1.6f', Template::FIELD_VALUE],
 						'htmlspecialchars'
 					]
 				]
 			)
 		);
-		// arguments 1, 2 + 3 (options): apply function() (closure)
+		// arguments 1, 2 + 3 (options): apply function (closure)
 		$this->assertEquals(
 			'<b>*abc*</b>',
 			$engine->render(
@@ -210,11 +214,28 @@ class TemplateTest extends TestCase
 				]
 			)
 		);
-		// arguments 1, 2 + 3 (options): apply function() (closure)
-		$closure1 = function($value, $field, &$data, $is_obj)
-					{
-						return '*' . $value . '*';
-					};
+		// arguments 1, 2 + 3 (options): apply 2 functions (closure)
+		$this->assertEquals(
+			'<b>+*abc*+</b>',
+			$engine->render(
+				'test-3',
+				[ 'var1' => 'abc' ],
+				[ 'var1' =>
+					[
+						function($value, $field, &$data, $is_obj) {
+							return '*' . $value . '*';
+						},
+						function($value, $field, &$data, $is_obj) {
+							return '+' . $value . '+';
+						},
+					]
+				]
+			)
+		);
+		// arguments 1, 2 + 3 (options): apply function (closure)
+		$closure1 = function($value, $field, &$data, $is_obj) {
+			return '*' . $value . '*';
+		};
 		$this->assertEquals(
 			'<b>*abc*</b>',
 			$engine->render(
@@ -224,7 +245,6 @@ class TemplateTest extends TestCase
 			)
 		);
 		// arguments 1, 2 + 3 (options): apply object method
-		//$testhelper = new testhelper;
 		$this->assertEquals(
 			'<b>*abc*</b>',
 			$engine->render(
@@ -237,7 +257,7 @@ class TemplateTest extends TestCase
 				]
 			)
 		);
-		// arguments 1, 2 + 3 (options): apply function
+		// arguments 1, 2 + 3 (options): apply custom function
 		$this->assertEquals(
 			'<b>*abc*</b>',
 			$engine->render(
@@ -262,17 +282,190 @@ class TemplateTest extends TestCase
 
 	}
 
+	public function testRenderObject()
+	{
+		$dataObj = new DataObj;
+
+		$templates = array(
+			'test-1' => '<b>{{var1}} {{var1}}</b>',
+			'test-2' => '<b>{{var1}} {{var2}}</b>',
+			'test-3' => '<b>{{var1}}</b>',
+			'test-4' => '{{var1}}',
+		);
+
+		$engine = new Template;
+		$engine->setTemplates($templates);
+
+		// arguments 1 + 2: replace values (1 field)
+		$this->assertEquals(
+			'<b>hello hello</b>',
+			$engine->render(
+				'test-1',
+				$dataObj
+			)
+		);
+		// arguments 1 + 2: replace values (2 fields)
+		$this->assertEquals(
+			'<b>hello world</b>',
+			$engine->render(
+				'test-2',
+				$dataObj
+			)
+		);
+		// arguments 1, 2 + 3 (options): apply htmlspecialchars
+		$dataObj->var1 = 'a&b';
+		$this->assertEquals(
+			'<b>a&amp;b</b>',
+			$engine->render(
+				'test-3',
+				$dataObj,
+				[ 'var1' => 'htmlspecialchars' ]
+			)
+		);
+		// arguments 1, 2 + 3 (options): apply htmlspecialchars with param
+		$this->assertEquals(
+			'<b>a&amp;b</b>',
+			$engine->render(
+				'test-3',
+				$dataObj,
+				[ 'var1' =>
+					[
+						['htmlspecialchars', Template::FIELD_VALUE, ENT_HTML5]
+					]
+				]
+			)
+		);
+		// arguments 1, 2 + 3 (options): apply sprintf
+		$dataObj->var1 = 'abc';
+		$this->assertEquals(
+			'<b>  abc</b>',
+			$engine->render(
+				'test-3',
+				$dataObj,
+				[ 'var1' =>
+					[
+						['sprintf', '%5s', Template::FIELD_VALUE]
+					]
+				]
+			)
+		);
+		// arguments 1, 2 + 3 (options): apply sprintf (wildcard)
+		$dataObj->var1 = 'abc';
+		$this->assertEquals(
+			'<b>  abc</b>',
+			$engine->render(
+				'test-3',
+				$dataObj,
+				[ '*' =>
+					[
+						['sprintf', '%5s', Template::FIELD_VALUE]
+					]
+				]
+			)
+		);
+		// arguments 1, 2 + 3 (options): apply 2 options
+		$dataObj->var1 = pi();
+		$this->assertEquals(
+			'<b>&amp; 3.141593</b>',
+			$engine->render(
+				'test-3',
+				$dataObj,
+				[ 'var1' =>
+					[
+						['sprintf', '& %1.6f', Template::FIELD_VALUE],
+						'htmlspecialchars'
+					]
+				]
+			)
+		);
+		// arguments 1, 2 + 3 (options): apply function (closure)
+		$dataObj->var1 = 'abc';
+		$this->assertEquals(
+			'<b>*abc*</b>',
+			$engine->render(
+				'test-3',
+				$dataObj,
+				[ 'var1' => function($value, $field, &$data, $is_obj)
+					{
+						return '*' . $value . '*';
+					}
+				]
+			)
+		);
+		// arguments 1, 2 + 3 (options): apply function (closure)
+		$closure1 = function($value, $field, &$data, $is_obj) {
+			return '*' . $value . '*';
+		};
+		$this->assertEquals(
+			'<b>*abc*</b>',
+			$engine->render(
+				'test-3',
+				$dataObj,
+				[ 'var1' => $closure1 ]
+			)
+		);
+		// arguments 1, 2 + 3 (options): apply object method
+		$this->assertEquals(
+			'<b>*abc*</b>',
+			$engine->render(
+				'test-3',
+				$dataObj,
+				[ 'var1' =>
+					[
+						[$this, 'render_abc' ]
+					]
+				]
+			)
+		);
+		// arguments 1, 2 + 3 (options): apply custom function
+		$this->assertEquals(
+			'<b>*abc*</b>',
+			$engine->render(
+				'test-3',
+				$dataObj,
+				[ 'var1' => 'render_abc' ]
+			)
+		);
+		// arguments 1, 2 + 3: option only (data['var1'] not set)
+		$obj = new stdClass;
+		$this->assertEquals(
+			'<b>*abc*</b>',
+			$engine->render(
+				'test-3',
+				$obj,
+				[ 'var1' => function($value, $field, &$data, $is_obj)
+					{
+						return '*abc*';
+					}
+				]
+			)
+		);
+
+	}
+
 	// used in testRender
 	public function render_abc($value, $field, &$data, $is_obj)
 	{
 		return '*' . $value . '*';
 	}
 
+	public function testRenderException()
+    {
+		$this->setExpectedException(Exception::class);
+
+		$engine = new Template;
+
+		// test template not found
+        $engine->render('test-404');
+    }
+
 	public function testEach()
 	{
-
 		$templates = array(
 			'test-1' => '<b>{{var1}}</b>',
+		);
+		$templates2 = array(
+			'test-1' => '<b>{{item}}</b>',
 		);
 
 		$engine = new Template;
@@ -310,12 +503,20 @@ class TemplateTest extends TestCase
 			' '
 		);
 
+		$engine2 = new Template;
+		$engine2->setTemplates($templates2);
+		// without delimiter
+		$a2 = $engine2->each(
+			'test-1',
+			['hello', 'world']
+		);
+
 		// generator mode
 		$result = '';
 		$rows = 0;
 		$addRow = function() use (&$rows, &$result){
 			while (true) {
-				$result .= yield;
+				$result .= (yield);
 				$rows++;
 			}
 		};
@@ -350,17 +551,33 @@ class TemplateTest extends TestCase
 		$this->assertEquals('<b>hello</b><b>world</b>', $a);
 		$this->assertEquals('<b>hello</b>' . n . '<b>world</b>', $b);
 		$this->assertEquals('<b>hello</b> <b>adam &amp; eve</b>', $c);
+		$this->assertEquals('<b>hello</b><b>world</b>', $a2);
 		$this->assertEquals(2, $rows);
 		$this->assertEquals('<b>hello</b> <b>adam &amp; eve</b>', $result);
 		$this->assertEquals(2, $rows2);
 		$this->assertEquals('<b>hello</b> <b>adam &amp; eve</b>', $result2);
-
 	}
+
+	public function testEachException()
+    {
+		$this->setExpectedException(Exception::class);
+
+		$engine = new Template;
+
+		// test template not found
+        $engine->each(
+            'test-404',
+            [
+                [ 'var1' => 'hello' ],
+                [ 'var1' => 'adam & eve' ]
+            ]
+        );
+    }
 
 	// used in testEach
 	private function addRow(&$rows, &$result) {
 		while (true) {
-			$result .= yield;
+			$result .= (yield);
 			$rows++;
 		}
 	}

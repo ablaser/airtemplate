@@ -25,14 +25,14 @@ class Template
     /**
      * String constant used for parameter replacement in field function calls.
      */
-    const FIELD_VALUE = '{value}';
+    const FIELD_VALUE = '$${v}$$';
 
     /**
      * Array of parsed templates.
      *
      * @var array
      */
-    protected $templates = array();
+    protected $templates = [];
 
     /**
      * Array of parse options.
@@ -41,24 +41,36 @@ class Template
      *
      * @var array
      */
-    protected $options = array();
+    protected $options = [];
+
+    /**
+     * Data array or object.
+     *
+     * @var array|object
+     */
+    private $fieldData;
+
+    /**
+     * Field options array.
+     *
+     * @var array
+     */
+    private $fieldOptions = [];
 
     /**
      * Constructor.
      *
      * @param array $options Template parser options
      */
-    public function __construct($options = array())
+    public function __construct($options = [])
     {
-        if (empty($options)) {
-            $this->options = array(
-                'splitPattern' => '/(\{\{)|\}\}/',
-                'fieldPrefix' => '{{'
-            );
-        } else {
+        $this->options = [
+            'splitPattern' => '/(\{\{)|\}\}/',
+            'fieldPrefix' => '{{'
+        ];
+        if (!empty($options)) {
             $this->options = $options;
         }
-        $this->templates = array();
     }
 
     /**
@@ -66,17 +78,19 @@ class Template
      * apply specified field rendering options.
      *
      * @param string       $name    Template name
-     * @param array/object $data    Replacement values
+     * @param array|object $data    Replacement values
      * @param array        $options Field rendering options
      *
      * @return string      The rendered output
      */
-    public function render($name, $data = array(), $options = array())
+    public function render($name, $data = [], $options = [])
     {
         if (!isset($this->templates[$name])) {
             throw new \Exception('Template "' . $name . '" does not exist.');
         }
-        return self::merge($this->templates[$name], $data, $options);
+        $this->fieldData = $data;
+        $this->fieldOptions = $options;
+        return $this->merge($name);
     }
 
     /**
@@ -97,35 +111,31 @@ class Template
     public function each(
         $name,
         $data,
-        $options = array(),
+        $options = [],
         $separator = '',
         $rowGenerator = null
     ) {
         if (!isset($this->templates[$name])) {
             throw new \Exception('Template "' . $name . '" does not exist.');
         }
+        $this->fieldOptions = $options;
+        $i = 0;
+        $buffer = '';
+        foreach ($data as $row) {
+            if (!is_array($row)) {
+                $row = ['item' => $row];
+            }
+            $this->fieldData = $row;
+            $temp = ($i > 0 ? $separator : '') . $this->merge($name);
+            if (!isset($rowGenerator)) {
+                $buffer .= $temp;
+            } else {
+                $rowGenerator->send($temp);
+            }
+            $i++;
+        }
         if (!isset($rowGenerator)) {
-            $buffer = '';
-            foreach ($data as $row) {
-                if (!is_array($row)) {
-                    $row = array('item' => $row);
-                }
-                $buffer .= ($buffer != '' ? $separator : '') .
-                    self::merge($this->templates[$name], $row, $options);
-            }
             return $buffer;
-        } else {
-            $i = 0;
-            foreach ($data as $row) {
-                if (!is_array($row)) {
-                    $row = array('item' => $row);
-                }
-                $rowGenerator->send(
-                    ($i > 0 ? $separator : '') .
-                        self::merge($this->templates[$name], $row, $options)
-                );
-                $i++;
-            }
         }
     }
 
@@ -136,7 +146,7 @@ class Template
      * @param array $sourceTemplates Assoc. array of raw templates
      * @param bool  $addTemplates    Add templates if true, replace otherwise
      *
-     * @return object                The object instance
+     * @return Template              The object instance
      */
     public function setTemplates($sourceTemplates, $addTemplates = false)
     {
@@ -157,7 +167,7 @@ class Template
      * @param array $templates    Assoc. array of compiled templates
      * @param bool  $addTemplates Add templates if true, replace otherwise
      *
-     * @return object             The object instance
+     * @return Template           The object instance
      */
     public function setParsedTemplates($templates, $addTemplates = false)
     {
@@ -167,8 +177,8 @@ class Template
             );
         }
         $this->templates = ($addTemplates)
-            ? array_merge($this->templates, $templates) :
-            $templates;
+            ? array_merge($this->templates, $templates)
+            : $templates;
         return $this;
     }
 
@@ -194,7 +204,7 @@ class Template
      */
     protected function parseTemplates($sourceTemplates)
     {
-        $templates = array();
+        $templates = [];
         foreach ($sourceTemplates as $name => $template) {
             $split = preg_split(
                 $this->options['splitPattern'],
@@ -204,10 +214,10 @@ class Template
             );
             $lsplit = count($split);
             $i = 0;
-            $tmpl = array();
+            $tmpl = [];
             while ($i < $lsplit) {
                 if ($split[$i] == $this->options['fieldPrefix']) {
-                    $tmpl[] = array(trim($split[$i + 1]));
+                    $tmpl[] = [trim($split[$i + 1])];
                     $i += 2;
                 } else {
                     $tmpl[] = $split[$i];
@@ -223,41 +233,69 @@ class Template
      * Merge template and values and return the rendered string. Replacement
      * values may be specified as an assoc array or an object.
      *
-     * @param array        $template A compiled template
-     * @param array|object $data     Replacement values (assoc array, object)
-     * @param array        $options  Fields rendering options
+     * @param string $name Template name
      *
-     * @return string                The rendered result
+     * @return string      The rendered result
      */
-    protected static function merge($template, $data, $options)
+    protected function merge($name)
     {
-        $is_obj = is_object($data);
+        $isObject = is_object($this->fieldData);
         $result = '';
-        foreach ($template as $part) {
-            if (is_array($part)) {
-                $field = $part[0];
-                $value = ($is_obj && isset($data->$field))
-                    ? $data->$field
-                    : (isset($data[$field]) ? $data[$field] : '');
-                $option = isset($options[$field])
-                    ? $options[$field]
-                    : (isset($options['*']) ? $options['*'] : '');
-                if ($option) {
-                    $result .= self::renderField(
-                        $value,
-                        $field,
-                        !is_array($option) ? (array) $option : $option,
-                        $data,
-                        $is_obj
-                    );
-                } else {
-                    $result .= $value;
-                }
-            } else {
+        foreach ($this->templates[$name] as $part) {
+            if (!is_array($part)) {
                 $result .= $part;
+                continue;
             }
+            $field = $part[0];
+            $value = self::getValue($field, $isObject);
+            $option = self::getOption($field);
+            if (empty($option)) {
+                $result .= $value;
+                continue;
+            }
+            $result .= $this->renderField(
+                $value,
+                $field,
+                $option,
+                $isObject
+            );
         }
         return $result;
+    }
+
+    /**
+     * get the value for a field or an empty string.
+     *
+     * @param string       $field    Field name
+     * @param bool         $isObject Set to true, if $data is an object
+     *
+     * @return mixed       Field value or empty string
+     */
+    protected function getValue($field, $isObject)
+    {
+        if ($isObject) {
+            return isset($this->fieldData->$field) ? $this->fieldData->$field : '';
+        }
+        return isset($this->fieldData[$field]) ? $this->fieldData[$field] : '';
+    }
+
+    /**
+     * get option for a field.
+     *
+     * @param string $field Field name
+     *
+     * @return array        Selected option or empty string
+     */
+    protected function getOption($field)
+    {
+        if (isset($this->fieldOptions[$field])) {
+            $option = $this->fieldOptions[$field];
+        } elseif (isset($this->fieldOptions['*'])) {
+            $option = $this->fieldOptions['*'];
+        } else {
+            return [];
+        }
+        return !is_array($option) ? (array) $option : $option;
     }
 
     /**
@@ -267,19 +305,18 @@ class Template
      *
      * @param string $value    Replacement value
      * @param string $field    Field name
-     * @param object $data     Replacement values
+     * @param array  $options  Options for this field
      * @param bool   $isObject Set to true, if $data is an object
      *
      * @return string          The formatted value
      */
-    protected static function renderField(
+    protected function renderField(
         $value,
         $field,
-        $option,
-        &$data,
+        $options,
         $isObject
     ) {
-        foreach ($option as $key => $opt) {
+        foreach ($options as $opt) {
             if (is_string($opt) && is_callable($opt)) {
                 $value = $opt($value);
             } elseif (is_array($opt) && isset($opt[0]) && is_callable($opt[0])) {
@@ -289,7 +326,7 @@ class Template
                 }
                 $value = call_user_func_array($opt[0], $param);
             } elseif (is_callable($opt)) {
-                $value = $opt($value, $field, $data, $isObject);
+                $value = $opt($value, $field, $this->fieldData, $isObject);
             }
         }
         return $value;

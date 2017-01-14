@@ -2,6 +2,11 @@
 
 A template engine for PHP devs. Lightweight, flexible and easy to use and extend in PHP.
 
+[![Build Status](https://img.shields.io/travis/ablaser/airtemplate/master.svg?style=flat-square)](https://travis-ci.org/ablaser/airtemplate)
+[![Coverage Status](https://img.shields.io/coveralls/ablaser/airtemplate/master.svg?style=flat-square)](https://coveralls.io/github/ablaser/airtemplate?branch=master)
+[![Scrutinizer Code Quality](https://img.shields.io/scrutinizer/g/ablaser/airtemplate.svg?style=flat-square)](https://scrutinizer-ci.com/g/ablaser/airtemplate/?branch=master)
+[![Latest Version](https://img.shields.io/github/release/ablaser/airtemplate.svg?style=flat-square)](https://packagist.org/packages/airtemplate/airtemplate)
+
 Templates *contain no logic*, just fields (named placeholders), but *logic can be applied* to these fields instead. This results in a complete separation of logic, template and content.
 
 AirTemplate is not a framework, just a library with two classes: The base class `Template` and `FileTemplate` which is an extension of `Template`. `Template` works in memory only, while `FileTemplate` provides access to templates stored as files.
@@ -10,7 +15,7 @@ It doesn't need much ressources, because it works internally mainly with arrays 
 
 ## Features
 
-* Lightweight: less than 250 lines of PHP-code (without comments).
+* Lightweight: less than 300 lines of PHP-code (without comments).
 * Clean templates with a simple syntax: `{{field}}`.
 * Supports custom field delimiters.
 * Efficient: Templates are *parsed only once*, when loaded.
@@ -18,10 +23,11 @@ It doesn't need much ressources, because it works internally mainly with arrays 
 * *Two* render methods: `render` and `each`.
 * Powerful field processing options using [PHP functions](#process-field-values-using-php-functions) and [*custom field render functions*](#using-custom-field-render-functions).
 * Supports a memory-saving [*generator mode*](#using-the-generator-mode).
-* Framework and environment agnostic, the base class `Template` depends only on PHP 5.4+.
+* Framework and environment agnostic, the base class `Template` depends only on PHP 5.5+.
 * Unit tested.
 * Compliant with [PSR-1 Coding Standard](http://www.php-fig.org/psr/psr-1/) and [PSR-2 Coding Style Guide](http://www.php-fig.org/psr/psr-2/).
 * Supports [PSR-4 Autoloading Standard](http://www.php-fig.org/psr/psr-4/).
+* Easy installation with composer or even without: only 2 files required.
 
 ## Installation
 

@@ -5,7 +5,7 @@ composer.lock
 # PHPUnit
 phpunit.xml
 phpunit.xml.dist
-/tmp/
+/build/
 
 # phpDocumentor
 /output/

@@ -1,0 +1,30 @@
+engines:
+  duplication:
+    enabled: true
+    config:
+      languages:
+      - php
+  fixme:
+    enabled: true
+  phpmd:
+    enabled: true
+    checks:
+      CleanCode/ElseExpression:
+        enabled: false
+    checks:
+      Naming/ShortVariable:
+        enabled: false
+    exclude_fingerprints:
+    - 98e8e0201f1eb85992c264b36e8e1204
+ratings:
+  paths:
+  - src/**
+exclude_paths:
+- tests/
+- vendor/
+- examples/
+- build/
+- LICENSE
+- **.md
+- **.json
+- **.xml

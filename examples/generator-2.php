@@ -117,8 +117,8 @@
 
     get_mem_usage_report();
     echo '<h3>Run benchmark</h3>', n;
-	echo '<p><a href="./big-table.php?iterations=10">Run benchmark test 10 times</a></p>', n;
-	echo '<p><a href="./big-table.php?iterations=100">Run benchmark test 100 times</a></p>', n;
+	echo '<p><a href="./generator-2.php?iterations=10">Run benchmark test 10 times</a></p>', n;
+	echo '<p><a href="./generator-2.php?iterations=100">Run benchmark test 100 times</a></p>', n;
 
 ?>
 

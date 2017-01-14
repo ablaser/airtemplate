@@ -1,0 +1,18 @@
+# .scrutinizer.yml
+
+build:
+    tests:
+        override:
+            - phpcs-run
+
+checks:
+    php: true
+
+filter:
+    paths:
+        - "src/*"
+    excluded_paths:
+        - "examples/"
+        - "tests/"
+        - "vendor/"
+        - "tmp/"

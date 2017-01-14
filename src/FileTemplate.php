@@ -45,38 +45,21 @@ class FileTemplate extends Template
      * @param string       $dir          Path to template directory
      * @param bool         $addTemplates Add templates if true, replace otherwise
      *
-     * @return object                    Returns the object instance
+     * @return object      Returns the object instance
      */
     public function loadTemplates($files, $dir = '', $addTemplates = false)
     {
-        $templates = array();
-        if (is_array($files)) {
-            if ($dir != '') {
-                $ffiles = array();
-                foreach ($files as $f) {
-                    $ffiles[] = $dir . DIRECTORY_SEPARATOR . $f;
-                }
-            } else {
-                $ffiles = $files;
-            }
-        } else {
-            $ffiles = glob(($dir != '' ? $dir . DIRECTORY_SEPARATOR : '') . $files);
-            if ($ffiles === false) {
-                throw new \Exception(
-                    'Glob() error. Search pattern: "' . $files . '"'
-                );
-            }
-        }
-        foreach ($ffiles as $file) {
+        $templates = [];
+        $tfiles = self::getFilenames($files, $dir);
+        foreach ($tfiles as $file) {
             $template = self::readFile($file);
-            if ($template !== false) {
-                $templates[basename($file)] = $template;
-            } else {
+            if ($template === false) {
                 throw new \Exception(
                     'File "' . $file . '" is not a file or not readable.',
                     E_USER_WARNING
                 );
             }
+            $templates[basename($file)] = $template;
         }
         return $this->setTemplates($templates, $addTemplates);
     }
@@ -87,7 +70,7 @@ class FileTemplate extends Template
      * @param string $filename Filename
      * @param int    $options  json_encode() options
      *
-     * @return mixed           False on error, Bytes written on success
+     * @return mixed False on error, Bytes written on success
      */
     public function saveParsedTemplates($filename, $options = 0)
     {
@@ -108,8 +91,32 @@ class FileTemplate extends Template
     {
         $res = self::readFile($filename);
         return $this->SetParsedTemplates(
-            ($res !== false) ? json_decode($res, true) : array()
+            ($res !== false) ? json_decode($res, true) : []
         );
+    }
+
+    /**
+     * Build a list of qualified filenames.
+     *
+     * @param string|array $files        Glob() Filemask or array of filenames
+     * @param string       $dir          Path to template directory
+     *
+     * @return array       Array of filenames
+     */
+    protected static function getFilenames($files, $dir = '')
+    {
+        if (is_array($files)) {
+            if ($dir == '') {
+                return $files;
+            }
+            $tfiles = [];
+            foreach ($files as $f) {
+                $tfiles[] = $dir . DIRECTORY_SEPARATOR . $f;
+            }
+            return $tfiles;
+        }
+        $tfiles = glob(($dir != '' ? $dir . DIRECTORY_SEPARATOR : '') . $files);
+        return ($tfiles !== false) ? $tfiles : [];
     }
 
     /**
