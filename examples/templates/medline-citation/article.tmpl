@@ -1,0 +1,12 @@
+<article>
+{{Journal|render("article-journal")}}
+<h3>{{ArticleTitle|esc}}</h3>
+<p>
+Language: {{Language|esc}}<br>
+First Author: {{AuthorLastName=/AuthorList/Author/0/LastName|esc}} {{AuthorForeName=/AuthorList/Author/0/ForeName|esc}}<br>
+{{Pagination|render("medline-pagination")}}
+</p>
+{{Abstract|render("article-abstract-text")}}
+{{AuthorList|each("article-author")}}
+{{PublicationTypeList|render("article-publication-type")}}
+</article>

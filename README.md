@@ -1,33 +1,46 @@
 # AirTemplate
 
-A template engine for PHP devs. Lightweight, flexible and easy to use and extend in PHP.
+A template engine for PHP devs. Fast, flexible and easy to use and extend.
 
 [![Build Status](https://img.shields.io/travis/ablaser/airtemplate/master.svg?style=flat-square)](https://travis-ci.org/ablaser/airtemplate)
 [![Coverage Status](https://img.shields.io/coveralls/ablaser/airtemplate/master.svg?style=flat-square)](https://coveralls.io/github/ablaser/airtemplate?branch=master)
 [![Scrutinizer Code Quality](https://img.shields.io/scrutinizer/g/ablaser/airtemplate.svg?style=flat-square)](https://scrutinizer-ci.com/g/ablaser/airtemplate/?branch=master)
+[![Code Climate](https://img.shields.io/codeclimate/github/ablaser/airtemplate.svg?style=flat-square)](https://codeclimate.com/github/ablaser/airtemplate)
+[![TestCoverage](https://img.shields.io/codeclimate/coverage/github/ablaser/airtemplate.svg?style=flat-square)](https://codeclimate.com/github/ablaser/airtemplate/coverage)
 [![Latest Version](https://img.shields.io/github/release/ablaser/airtemplate.svg?style=flat-square)](https://packagist.org/packages/airtemplate/airtemplate)
 
-Templates *contain no logic*, just fields (named placeholders), but *logic can be applied* to these fields instead. This results in a complete separation of logic, template and content.
+AirTemplate has only one tag: `{{field|option|...}}`. Syntax is inspired by Twig, but it's not exactly the same. So it's more a templating system than a templating language.
 
-AirTemplate is not a framework, just a library with two classes: The base class `Template` and `FileTemplate` which is an extension of `Template`. `Template` works in memory only, while `FileTemplate` provides access to templates stored as files.
+However, AirTemplate has -- beside the usual `render` method -- an `each` method which can iterate over arrays and traversable objects, and field options are another powerful way to apply logic to templates and fields.
 
-It doesn't need much ressources, because it works internally mainly with arrays instead of instantiating objects for each template.
+It's even possible to "include" sub-templates using `render` and `each` options. This allows AirTemplate to render not only flat data structures like those returned from database queries, but also nested arrays, XML and JSON structures.
+
+AirTemplate has grown from a library to a little framework, but it's still much smaller than Twig or Mustache. Most components have no dependencies beside PHP 5.5 or better.
+
+The only exceptions are the `FilesystemLoader` and the `CacheLoader`, which support logging to a PSR-3 compatible logger (for debugging purposes). The `CacheLoader` supports PSR-6 compatible caching too.
 
 ## Features
 
-* Lightweight: less than 300 lines of PHP-code (without comments).
-* Clean templates with a simple syntax: `{{field}}`.
+* Lightweight: less than 50k (all components, including comments).
+* Clean templates with a simple syntax: `{{field|option|option|...}}`.
 * Supports custom field delimiters.
-* Efficient: Templates are *parsed only once*, when loaded.
+* Efficient: Templates are *parsed only once*.
+* Parsed templates can be cached to speed up the initialisation phase.
 * Suitable for any size and type of text based output, not only HTML.
+* AirTemplate can render flat and nested datastructures (database query results, XML etc).
 * *Two* render methods: `render` and `each`.
-* Powerful field processing options using [PHP functions](#process-field-values-using-php-functions) and [*custom field render functions*](#using-custom-field-render-functions).
-* Supports a memory-saving [*generator mode*](#using-the-generator-mode).
-* Framework and environment agnostic, the base class `Template` depends only on PHP 5.5+.
+* Powerful [field processing options](#field-options).
+* Supports a memory-saving [*generator mode*](#generator-mode).
+* Framework and environment agnostic. Depends only on PHP 5.5+, psr/log and psr/cache.
 * Unit tested.
-* Compliant with [PSR-1 Coding Standard](http://www.php-fig.org/psr/psr-1/) and [PSR-2 Coding Style Guide](http://www.php-fig.org/psr/psr-2/).
-* Supports [PSR-4 Autoloading Standard](http://www.php-fig.org/psr/psr-4/).
-* Easy installation with composer or even without: only 2 files required.
+* Conforms to the following [PSR Standards](http://www.php-fig.org/):
+	* [PSR-1 Basic Coding Standard](http://www.php-fig.org/psr/psr-1/)
+	* [PSR-2 Coding Style Guide](http://www.php-fig.org/psr/psr-2/)
+	* [PSR-4 Autoloading Standard](http://www.php-fig.org/psr/psr-4/)
+* Supports PSR compatible logging and caching:
+	* [PSR-3 Logger Interface](http://www.php-fig.org/psr/psr-3/)
+	* [PSR-6 Caching Interface](http://www.php-fig.org/psr/psr-6/)
+* Easy installation with composer (and without too).
 
 ## Installation
 
@@ -38,7 +51,7 @@ Just create a composer.json file for your project:
 ```JSON
 {
     "require": {
-        "airtemplate/airtemplate": "~0.1"
+        "airtemplate/airtemplate": "~0.2"
     }
 }
 ```
@@ -57,402 +70,228 @@ Then you can include the autoloader, and you will have access to the library cla
 <?php
 require 'vendor/autoload.php';
 ```
-
-Without autoloading, you need to require (or include) the classes as usual.
-
-Remember to require the `Template` too when using `FileTemplate`, because it's an extension of the `Template` class.
+Without composer, you can use AirTemplate's own autoloader, where `path/to/src` is the path to
+your installation directory.
 
 ```php
 <?php
-require 'path/to/Template.php';
-require 'path/to/FileTemplate.php';
+require 'path/to/src/lib/autoload.php';
+```
+
+Without autoloading at all, you need to require (or include) the classes as usual.
+
+```php
+<?php
+require 'path/to/src/ParserInterface.php';
+require 'path/to/src/Parser.php';
+require 'path/to/src/Loader/LoaderInterface.php';
+require 'path/to/src/Loader/Loader.php';
+// replace 'ArrayLoader' by 'FilesystemLoader' or 'CacheLoader' as appropriate
+require 'path/to/src/Loader/ArrayLoader.php';
+require 'path/to/src/EngineInterface.php';
+require 'path/to/src/BaseEngine.php';
+require 'path/to/src/Engine.php';
+require 'path/to/src/Builder.php';
 ```
 
 ## Usage
 
-AirTemplate works after this principle:
+AirTemplate is split into several components, but for the setup are just two components needed, a *loader* and the *builder*. Loaders are responsible for loading and parsing templates, while the builder creates a rendering engine from these templates.
 
-* Create object instance
-* Load templates
-* Use the templates to render output
+Three loaders are available, which loads templates from PHP (`ArrayLoader`), from the file system (`FilesystemLoader`) or from cache (`CacheLoader`).
 
-The templates will be parsed once when they are loaded. After that, there is no more parsing or searching needed to render these templates.
+The following example was taken from [https://github.com/bobthecow/mustache.php](https://github.com/bobthecow/mustache.php). The full code is in the examples directory.
 
-### Templates
-
-Templates are pieces of code or markup, interspersed with fields. Templates can have no fields at all or as much fields as required. Fields are delimited by `{{` and `}}`, but other delimiters may be specified through the class constructor.
-
-> Fields can contain any kind of text based content, also rendered partials or widgets. This makes it easy to include such content provided by external sources like CMS functions or web-services.
-
-AirTemplate typically needs a set of named templates to render the output. This is the reason why templates must be organised as an array when they are defined in PHP and used with the `Template` class.
-
-Most examples uses the `Template` class and the following templates:
+This is the view context object representing our data (Chris.php):
 
 ```php
-$templates = array(
-	'hello'       => '<p>Hello <b>{{who}}</b>!</p>',
-	'rendered-by' => '<p>Content rendered by <b>{{product}}</b> at {{time}}.</p>',
-	'pi'          => '<p>This is the value of Pi: <b>{{pi}}</b></p>',
-	'list'        => '<ul>
-{{items}}
-</ul>'
-	'list-item'   => '<li>{{item}}</li>'
-);
+<?php
+class Chris {
+    public $name  = "Chris";
+    public $value = 10000;
+
+    public function taxed_value() {
+        return $this->value - ($this->value * 0.4);
+    }
+
+    public $in_ca = true;
+}
 ```
 
-Templates may also be stored as files and used with the [`FileTemplate` class](#using-the-extended-filetemplate-class). A templates array is not needed in this case. The file basename (incl. extension) is used as the template name and array key.
-
-There are some sample templates in [examples/templates](./examples/templates), which are used in the menu-page example [`index.php`](./examples/index.php).
-
-### Using the base class `Template`
-
-The following code creates an instance as usual and loads the templates from above using the `setTemplate` method.
+This is one variant to render this template. Note, that the template has been split into two partials, as AirTemplate has no if/else construct. The condition is simply evaluated in PHP.
 
 ```php
-$engine = new AirTemplate\Template;
-$engine->setTemplates($templates);
+require './lib/bootstrap.php';
+require './lib/Chris.php';
+
+use AirTemplate\Builder;
+use AirTemplate\Loader\ArrayLoader;
+
+$templates = [
+    'canonical' => 'Hello {{name}}
+You have just won {{value}} dollars!
+',
+    'in_ca' => 'Well, {{taxed_value|data:taxed_value}} dollars, after taxes.
+'
+];
+
+$chris = new Chris;
+
+$builder = new Builder(new ArrayLoader);
+$engine = $builder->build($templates);
+
+echo $engine->render('canonical', $chris);
+if ($chris->in_ca == true) {
+    echo $engine->render('in_ca', $chris);
+}
 ```
 
-It's also possible to 'compose' a template set from multiple source template arrays, when the second parameter is set to true. In this case, the new templates will be merged using `array_merge`.
-
-> If duplicate keys (template names) exist, then the template from the merged array will override the existing template.
-
-Building a template set from multiple source arrays. The `setTemplates`, `setParsedTemplates` methods from the `Template` class and also `loadTemplates` and `loadParsedTemplates` from `FileTemplate` are chainable like shown below.
+Well, AirTemplate is flexible and there is another way to create the exact same output:
 
 ```php
-$engine
-	->setTemplates($templates)
-	->setTemplates($templates2, true);
+require './lib/bootstrap.php';
+require './lib/Chris.php';
+
+use AirTemplate\Builder;
+use AirTemplate\Loader\ArrayLoader;
+
+$templates = [
+    'canonical' => 'Hello {{name}}
+You have just won {{value}} dollars!
+{{in_ca|user:inCa}}',
+    'in_ca' => 'Well, {{taxed_value|data:taxed_value}} dollars, after taxes.
+'
+];
+
+function inCa($value, $field, $data)
+{
+    global $engine;
+    if ($value == false) {
+        return '';
+    }
+    return $engine->render('in_ca', $data);
+}
+
+$chris = new Chris;
+
+$builder = new Builder(new ArrayLoader);
+$engine = $builder->build($templates);
+
+echo $engine->render('canonical', $chris);
 ```
 
-#### Custom field delimiters
+Here, we add a field `in_ca` at the end of template `canonical` and apply the user function `inCa` to it. This function renders the `in_ca` template, if chris lives in California or returns an empty string if not. The parameter `$value` is set to `$chris->in_ca` when the function is called.
 
-Custom field delimiters can be set using an array through the class constructor. There are two options that must be set: `splitPattern` and `fieldPrefix`. The split-pattern is a regular expression needed for the PHP-function `preg_split`, the prefix is a string.
+Now, there is only one render call in the main program flow, and the user function `inCa` decides if it should render the `in_ca` template or not, so the field `in_ca` acts like a conditional field.
 
-> One important thing to note is that the regular expression for the *starting delimiter must be enclosed* in parentheses and must also match the field prefix, but the *ending delimiter must NOT be enclosed* in parentheses. This is, because the template parser needs the prefix to recognize the following token as a field name.
+Templates may also be stored in files. Assume, the two templates from the example above are stored as two separate files in directory `./templates/mustache-canonical`.
 
-To use field delimiters `[@field]`, the options array would look like this:
-
-```php
-$options = array(
-	'splitPattern' => '/(\[@)|\]/',
-	'fieldPrefix'  => '[@'
-);
-$engine = new AirTemplate\Template($options);
-```
-
-Look, how the parentheses are used within the `split_pattern` to 'catch' the starting field delimiter.
-
-### Creating output using `render`
-
-The `render` method is used to create an instance from a template. The method signature is as follows:
-
-```php
-public function render(
-	$name,
-	$data = array(),
-	$options = array()
-)
-```
-
-`render` accepts 1-3 parameters:
-
-* *name*: The template name.
-* *data*: The data array or object.
-* *options*: The field options array.
-
-The data array or object typically contains values for the fields in the template, while the options array may contain instructions to be applied to the fields.
-
-The field-names defined in the template are used to 'lookup' values in the data and options arrays.
-
-#### Field options
-
-The power and flexibility of AirTemplates lays in the field options, as these can be used to *apply* PHP functions or custom field render functions to fields when they are rendered.
-
-Render options can be set on a per-field basis, but a wildcard ('*') can be used to apply an option to all fields in the template. The wildcard option is ignored, if a field-specific function is also defined.
-
-Multiple options can be applied to a single field, by wrapping them in an array.
-
-Without an option, the field value will be returned 'as is'. If there is also no field value, an empty string ('') is returned instead.
-
-Possible use cases for field options are:
-
-* Process field values using PHP functions like `htmlspecialchars`, `sprintf`, `strip_tags` and similar functions.
-* Apply custom field render functions which can do even more:
-	* Transform and modify the field value (e.g. render Markdown or Textile).
-	* Access data in deeper nested levels of the data array or in sub-objects.
-	* Create field content on the fly (e.g. calculate an MD5 hash from a string value).
-	* Create and add fields to the data array (data objects may or may not support this feature).
-	* Request data or content from external sources (e.g. Databases, Web-Services, Sensors).
-	* Use CMS or application functions and methods that render widgets or partials.
-
-##### Process field values using PHP functions
-
-There are two methods to apply standard functions to a field.
-
-```php
-// simple method
-$options = ['fieldname' => 'function name'];
-// complex method
-$options = ['fieldname' => ['function name', <param>, <param>, ...]];
-```
-
-The simpler method with only a function-name can only be used with functions (PHP and custom) that await its input on the first parameter, has no other required parameters and returns a result value.
-
-This is sufficient for many popular PHP functions like these:
-
-```php
-$options = ['fieldname' => 'htmlspecialchars'];
-$options = ['fieldname' => 'rawurlencode'];
-$options = ['fieldname' => 'strip_tags'];
-$options = ['fieldname' => 'md5'];
-```
-
-The complex method needs an array, but it makes functions available which requires more than one parameter. The first element of that array must be the name of the function, while following elements are the parameters passed to the function in the specified order.
-
-Some examples:
-
-```php
-$options = ['fieldname' => ['sprintf', '%1.6f', Template::FIELD_VALUE]];
-$options = ['fieldname' => ['htmlspecialchars', Template::FIELD_VALUE, ENT_HTML5]];
-```
-
-A special parameter value, `Template::FIELD_VALUE`, is used as a placeholder for
-the position where the field value should be passed to the function.
-
-##### Custom field render functions
-
-You can also define your own [*field render functions*](#using-custom-field-render-functions) to process the field value. They an be implemented as class methods (static and non-static) or anonymous functions (closures).
-
-These functions can do more, because they get not only the value but also context information from the template engine.
-
-Four parameters are passed to field render functions:
-
-* *value*: The field value from the data array or object.
-* *field*: The name of the field currently being rendered.
-* *data*: The data array or object passed to `render` or `each`.
-* *isObject*: A flag, that is set to true, if the data parameter is an object.
-
-The data parameter can optionally be passed by reference. This can - for example - be used to reduce the number of function calls, if multiple fields should be created dynamically. In that case, you can define a single function which creates these fields and updates the data array, so they can be used later on in the same template, when these fields must be rendered.
-
-This scenario is generally possible when the data parameter is an array. However, it may or may not be possible when data is an object.
-
-##### Multiple render options
-
-Multiple options can simpliy be specified by wrapping them in an array. The field value will be 'piped' through the defined options in a 'first-in first-out' order. So the original value will be passed as input to the first option, and the result of this will be passed to the second option and so on.
-
-Options can be PHP functions and also custom field render functions.
-
-```php
-$options = ['fieldname' => ['option1', 'option2', 'option3']];
-```
-
-Suppose we want a to create a string that must be ecaped and also padded to the right with dots. We need two PHP functions to achieve this, `sprintf` and `htmlspecialchars`.
+Then, we can use the `FilesystemLoader` to load it:
 
 ```php
 $templates = [
-	'test' => '<pre>{{str}}</pre>'
+	'canonical.tmpl',
+    'in_ca.tmpl'
 ];
-$options = [
-	'str' => [
-		['sprintf', "%'.-5s", Template::FIELD_VALUE],
-		'htmlspecialchars'
-	]
-];
-echo $engine->render('test', ['str' => '&'], $options)
+
+$builder = new Builder(new FilesystemLoader('./templates/mustache-canonical'));
+$engine = $builder->build($templates);
 ```
 
-This will first pad the string with four spaces, then it is escaped. The result is `<pre>&amp;....</pre>`, which will correctly be displayed in the browser as an ampersand followed by four dots.
+The templates array now contains filenames instead of the templates itself. Filenames may also be fully qualified pathnames.
 
-Multiple options are probably most useful in combination with the `each` method. Array values can be formatted without the need to traverse it and apply the formatting before it is rendered (and traversed again).
-
-### Render arrays using `each`
-
-`each` creates an instance of the supplied template for each item in the data array. It works with simple arrays, but also with two-dimensional arrays like those returned by database queries.
-
-This is the function signature of `each`:
+A file mask like `*.tmpl` can also be used, to load a set of template files from the directory given to the constructor of the loader (or set using `setDir`).
 
 ```php
-public function each(
-	$name,
-	$data,
-	$options = array(),
-	$separator = '',
-	$rowGenerator = null
-)
+$builder = new Builder(new FilesystemLoader('./templates/mustache-canonical'));
+$engine = $builder->build('*.tmpl');
 ```
 
-`each` accepts 2-5 parameters:
+The `CacheLoader` works exactly the same as the `FilesystemLoader`, but it is able to store parsed templates in a PSR-6 compatible caching system like `symfony/cache`. This may speed up initialisation, because the templates are stored in parsed format and as a single file.
 
-* *name*: The template name.
-* *data*: The data array.
-* *options*: The field options array.
-* *separator*: An optional separator to be inserted between rendered rows.
-* *rowGenerator*: An optional PHP generator function, that receives rendered rows, one-by-one.
+### Render methods
 
-Parameters 1 and 3 are the same as with `render`, but the data parameter is required and must be an array. A separator which is inserted between rendered rows may be specified. In the last parameter, a [PHP generator function](#using-the-generator-mode) can be specified.
+AirTemplate has two render methods: `render` and `each`.
 
-The data parameter is an array that is traversed with a `foreach` loop. Defined options will be applied to the fields of each row.
-
-The individual items of 1-dimensional arrays are accessible in templates using the default field-name `{{item}}` (see template "list-item"). For two-dimensional arrays, the array keys of the row are used as field names.
-
-The following code renders a simple, one-dimensional array as an unordered list. `htmlspecialchars` is applied to each array item and a newline character is added between rendered list items.
+The `render` method (see example above) is used to create a single instance from a template, while `each` can create multiple instances from a template.
 
 ```php
+echo $engine->render("template-name", $data);
+echo $engine->each("template-name", $data[, "separator"[, $rowGenerator]]);
+```
+
+The `$data` parameter can be an array or an object, that contains keys or members with the fieldnames used in the template.
+
+If `each` is called with an object, it must be traversable. That means, it must implement a traversable interface (e.g. Traversable, Iterator, Generator). The method has two optional parameters. A separator to be inserted between rendered rows and a [*row generator function*](#generator-mode).
+
+The following is a simple example of the `each` method.
+
+Two templates are defined to build an unordererd list. The `list` template contains one field, `{{items}}`, which will be replaced by the outcome of the `each` method. `each` is called with the `list-item` template and a simple data array. A newline character will be inserted between list items.
+
+Note: The fieldname for simple arrays like in this example will always be `item`.
+
+```php
+$templates = [
+	'list' => '<ul>
+{{items}}
+</ul>'
+	'list-item' => '<li>{{item|esc}}</li>'
+];
+
+$builder = new Builder(new ArrayLoader);
+$engine = $builder->build($templates);
+
 echo $engine->render(
 	'list',
 	[
 		'items' => $engine->each(
 			'list-item',
 			['one', 'two', 'three'],
-			['item' => 'htmlspecialchars'],
 			"\n"
 		)
 	]
 );
 ```
 
-#### Using custom field render functions
+And because AirTemplate is flexible, there is another way to do the same.
 
-This is an advanced example that renders a two-dimensional array and uses a field render function to create computed (or derived) fields.
-
-We create two new fields, `email` and `email_link`, and add them to the data array. This happens in the closure function that is assigned to `$username`. This function will be executed for each row in the data array, when the field `username` is rendered. The generated values will be used later to fill the fields.
-
-Note that the `$data` array must be passed by reference, so we can modify it within the closure.
-
-The currently processed field and fields that follow can be generated. Fields preceding the current field in the template are not changable anymore.
+The `each` method can also be used as an option and applied to the field `items`. The content of the field `items` in the call to `render` is now just the raw data array. The content of this field is then passed to `each`, together with the template name and the separator.
 
 ```php
-$data = [
-  ['username' => 'bob', 'domain' => 'example.com'],
-  ['username' => 'mary', 'domain' => 'example.com'],
-  ['username' => 'jenny', 'domain' => 'example.com'],
-];
-
 $templates = [
-
-	'table' => '<table>
-<thead>
-<tr>
-{{thead}}
-</tr>
-</thead>
-<tbody>
-{{tbody}}
-</tbody>
-</table>',
-
-	'th' => '<th>{{item}}</th>',
-
-	'tr' => '<tr>
-<td>{{username}}</td>
-<td>{{email}}</td>
-<td>{{email_link}}</td>
-</tr>'
-
+	'list' => '<ul>
+{{items|each("list-item", "\n")}}
+</ul>'
+	'list-item' => '<li>{{item|esc}}</li>'
 ];
 
-// Field render function
-// extending the data array: create two new elements in $data
-// when 'username' is rendered
-$username = function($value, $field, &$data, $options, $isObject) {
-	// create new fields in $data
-	$data['email'] = htmlspecialchars($value . '@' . $data['domain']);
-	$data['email_link'] = '<a href="mailto:' .
-		$value . '@' . $data['domain'] . '">' . $data['email'] . '</a>';
-	// return username
-	return htmlspecialchars($value);
-}
+$builder = new Builder(new ArrayLoader);
+$engine = $builder->build($templates);
 
-// render it
-// Please note that the variable $username has NO parentheses ().
 echo $engine->render(
-	'table',
+	'list',
 	[
-		'thead' => $engine->each('th', ['Username', 'Email', 'Email link'], "\n"),
-		'tbody' => $engine->each('tr', $data, ['username' => $username], "\n")
+		'items' => ['one', 'two', 'three']
 	]
 );
 ```
 
-This will create the following output:
+#### Generator Mode
 
-```html
-<table>
-<thead>
-<tr>
-<th>Username</th>
-<th>Email</th>
-<th>Email link</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>bob</td>
-<td>bob@example.com</td>
-<td><a href="mailto:bob@example.com">bob@example.com</a></td>
-</tr>
-<tr>
-<td>mary</td>
-<td>mary@example.com</td>
-<td><a href="mailto:mary@example.com">mary@example.com</a></td>
-</tr>
-<tr>
-<td>jenny</td>
-<td>jenny@example.com</td>
-<td><a href="mailto:jenny@example.com">jenny@example.com</a></td>
-</tr>
-</tbody>
-</table>
-```
+Normally, `each` accumulates the rendered rows in memory and returns it as a string when all rows are rendered. This can lead to growing memory use if there are many rows or if rows have a lot of columns.
 
-This can also be done otherwise (see next example), by defining two closures for the fields `email` and `email_link`. These functions can create and return the field value without adding it to the data array.
-
-#### Using the generator mode
-
-In the example above, the full table will be rendered in memory. Not a problem with only 3 rows of data, but with hundreds of rows it will probably exceed the memory limit. But fortunately, there is an easy way to circumvent this.
-
-This is where the 5-th parameter comes into play. You can specify a PHP generator function here, that will receive rendered rows on a one-by-one basis. Generators are a relatively new feature in PHP, but they come in handy in situations like this.
-
-We use the same data as above, and the result will be the same. Note the difference in the table template, it is split into two parts and the field `tbody` was dropped. Rendered templates are not accumulated in memory, but directly written to the output via echo.
+The row generator function (see [Generators](http://php.net/manual/en/language.generators.php)) is a way to circumvent this. If such a function is given, AirTemplate works in generator mode and will send rendered rows, one by one, to the function instead of keeping them all in memory. The row generator function can then write the rows to a stream for example. It's an efficient way to render large amounts of data without having 'peaks' in memory usage.
 
 ```php
 $templates = [
-
-	'table-start' => '<table>
-<thead>
-<tr>
-{{thead}}
-</tr>
-</thead>
-<tbody>
-';
-
-	'table-end' => '
-</tbody>
-</table>',
-
-	'th' => '<th>{{item}}</th>',
-
-	'tr' => '<tr>
-<td>{{username}}</td>
-<td>{{email}}</td>
-<td>{{email_link}}</td>
-</tr>'
-
+	'list-start' => '<ul>
+'
+	'list-end' => '</ul>
+'
+	'list-item' => '<li>{{item|esc}}</li>'
 ];
 
-// Field render functions
-$email = function($value, $field, $data, $options, $isObject) {
-	return htmlspecialchars($data['username'] . '@' . $data['domain']);
-}
-$email_link = function($value, $field, $data, $options, $isObject) {
-	return '<a href="mailto:' .
-		$data['username'] . '@' . $data['domain'] . '">' .
-		htmlspecialchars($data['username'] . '@' . $data['domain']) . '</a>';
-}
-
-// receive rows one-by-one and write it to the output
+// receive list-items one-by-one and write it to the output
 // this tiny closure acts as a co-routine to the each-method
 $rowGenerator = function() {
 	while (true) {
@@ -460,59 +299,290 @@ $rowGenerator = function() {
 	}
 }
 
-// render the beginning of the table
-echo $engine->render(
-	'table-start',
-	[
-		'thead' => $engine->each('th', array('Username', 'Email'))
-	]
+$builder = new Builder(new ArrayLoader);
+$engine = $builder->build($templates);
+
+echo $engine->render('list-start');
+// echo items in the genarator function
+$engine->each('list-item', ['one', 'two', 'three'], PHP_EOL, $rowGenerator());
+echo $engine->render('list-end');
 );
-// create table body using the generator function
-// No echo here, as 'each' does not return anything in generator mode
-$engine->each(
-	'tr',
-	$data,
-	['email' => $email, 'email_link' => $email_link],
-	"\n",
-	$rowGenerator()
-);
-// complete the table
-// There is no field in this template, so we need only the name parameter
-echo $engine->render('table-end');
 ```
 
-### Using the extended `FileTemplate` class
+The list template has been split into a `list-start` and `list-end` template, so they can be separately written to the output. The `each` method returns nothing, when using the generator mode. The list items are echoed out in the generator function.
 
-Templates can also be stored in files and loaded via `FileTemplate`. This class extends `Template` by adding file access features. `FileTemplate` does not alter any of the existing methods, so its fully compatible with the `Template` class.
+There are two more examples of the generator mode in the `benchmark` directory.
 
-Three methods are added, `loadTemplates`, `loadParsedTemplates` and `saveParsedTemplates`.
+### Templates
 
-The `loadTemplate` method accepts either a (glob-)filemask or an array of filenames. The second parameter is optional and may specify a directory path. Using the filemask is simpler, but requires a clean naming convention and/or sub-directories to build template sets.
+Templates in AirTemplate can also be called partials. So in most cases, more than one template is required to render a page, a widget or something else.
 
-The third parameter may be set to `true`, to add the templates to the internal array.
+Templates consist solely of the template code itself and embedded fields.
 
-The other two methods, `loadParsedTemplates` and `saveParsedTemplates`, provides a simple caching mechanism. They make it possible to store *all parsed templates* - JSON encoded - in a single file and reload it later. This may save some milliseconds as there is only one file to read and the templates must not be parsed again.
+#### Fields
 
+Fields are the only element needed by AirTemplate. The syntax is as follows (optional parts in square brackets []):
+
+```
+{{fieldname[=[/]datapath][|option][|option]}}
+```
+
+The fieldname 'links' this placeholder with an element in the data object or array. A single datapath preceded by an equal sign (=) and one or more options, preceded by a pipe symbol (|) may follow the fieldname.
+
+Templates may contain multiple fields, and the field delimiters can be customized.
+
+##### Custom field delimiters
+
+Custom field delimiters can be set through the loader class constructor. There are two options that must be set: `splitPattern` and `fieldPrefix`. The split-pattern is a regular expression needed for the PHP-function `preg_split`, the prefix is a string.
+
+> One important thing to note is that the regular expression for the *starting delimiter must be enclosed* in parentheses and must also match the field prefix, but the *ending delimiter must NOT be enclosed* in parentheses. This is, because the template parser needs the prefix to recognize the following token as a field name.
+
+To use field delimiters `[@field]`, the options array would look like this:
 
 ```php
-use AirTemplate\FileTemplate;
-$engine = new FileTemplate;
-// load templates with a specific filename pattern and add two more
-// with specific names using and array of filenames
-$engine
-	->loadTemplates('test_*.tmpl', './templates')
-	->loadTemplates(['form_1.tmpl', 'form_2.tmpl'], './templates', true);
-
-// save and load parsed templates
-$engine->saveParsedTemplates('./cache/test_1.json');
-$engine->loadParsedTemplates('./cache/test_1.json');
+$options = [
+	'splitPattern' => '/(\[@)|\]/',
+	'fieldPrefix'  => '[@'
+];
+$loader = new ArrayLoader($options);
+// or
+$loader = new FilesystemLoader('path/to/templates', $options);
 ```
+
+Note, how the parentheses are used within the `split_pattern` to catch the starting field delimiter.
+
+##### Datapath
+
+A datapath is similar to an XPath expression, as is can be used to access nested values in the data object or array. There are some limitations, but it works well with nested arrays and object types like `SimpleXMLElement`. In case of a simple XML object, it is also possible to access attributes.
+
+However, members in a `stdClass` with numeric keys are not accessible using datapath.
+
+Datapath has the following syntax:
+
+```
+[/]key[/key]][/@attr]
+```
+
+Keys must be separated by a slash. A datapath may be absolute (with a leading slash) or relative to the current field. A leading slash gives access to all keys or properties in the data array or object.
+
+The last element in a datapath may be an attribute, if the data object is a simple XML object.
+
+An example:
+
+```php
+$data = [
+	'key1' => [
+		'key1.1' => [ 'hello' ],
+		'key1.2' => [ 'world' ]
+	],
+	'key2' => [
+		'key2.1' => 'abc'
+	]
+]
+
+$template = [
+	'relative' => '{{key1=key1.2}}',
+	'absolute' => '{{key1=/key2.1}}'
+]
+```
+
+Template `relative` will output 'world', while `absolute` will output 'abc' when `render` is called with this data structure.
+
+##### Field Options
+
+Field options are the key to extend the built-in functionality of AirTemplate. They can be used to format or transform field values in any way you like, but also to include sub-templates or turn a field into a logical element.
+
+There are five different variants, which are called with different parameters:
+
+```
+// 1
+|shortcut
+|function
+|\Classname::staticMethod
+
+// 2
+|function(arg[, arg])
+
+// 3
+|user:function
+|app:method
+|app::staticMethod
+
+// 4
+|data:method
+|data::staticMethod
+
+// 5
+|render("template"[, ?])
+|each("template"[, "separator"])
+|default("Default Value")
+```
+
+1. Shortcuts, Global functions, Static methods<br>
+   These are called with a single parameter: the field value.
+2. Functions with parameters<br>
+   Such functions are called with the specified parameter list. Parameters must be constants (strings, numbers) or a question mark (?) as a placeholder for the field value (e.g. `sprintf("%1.6f", ?)`).
+3. User functions and application methods<br>
+   These functions are called with three parameters, field value, field name and the data object or array. Function and method names must be prepended by `user:`, `app:` or `app::`.
+4. Data object methods<br>
+   These will be called without any parameter and are only available, when data (passed to `render` or `each`) is an object. Method names must be prepended with `data:` or `data::`.
+5. Built-in methods<br>
+   `render` and `each` are used to render sub-templates in nested data-structures. They are called with the template name and the value of the current field.<br>
+   The separator in `each` is optional and defaults to an empty string ('').<br>
+   Default value must be a (properly encoded) string.
+
+###### Shortcuts, Global functions, Static methods
+
+The simplest form of options works with functions (PHP and custom) that await its input on the first parameter, has no other required parameters and returns a result value. Therefore, many well known functions like `strip_tags`, `md5` and similar functions can be used out of the box.
+
+A few useful shortcuts are defined to make it a bit simpler: `esc`, `escape`, `lcase`, `ucase`, `int`, `float`, `urlenc` and `rawurlenc`.
+
+```
+// Capitalize words in field title, then escape it with 'htmlspecialchars'
+{{title|ucwords|esc}}
+// Rawurlencode the field article_url
+{{article_url|rawurlenc}}
+// Transform bodytext markdown into HTML
+{{bodytext|\Michelf\Markdown::defaultTransform}}
+```
+
+###### Functions with parameters
+
+Some useful functions (like `sprintf`) require more than one parameter. Such functions can be called with a parameter list, which is specified as a list of (constant) values between parentheses. The question mark is used as a placehoder for the field value.
+
+The parameter list is parsed with `str_getcsv` and must therefore follow the format defined in the PHP manual. However, the question mark can be written without quotes.
+
+```
+// Format the price field with 'sprintf'
+// The price field is injected as second parameter, replacing the question mark (?)
+{{price|sprintf("$%1.2f", ?)}}
+// Convert value to a float and format it using the PHP function 'number_format'
+{{value|float|number_format(?, 2, ".", " ")}}
+```
+
+###### User functions and application methods
+
+These functions are called with three parameters, field value, field name and the data object or array. User functions are very powerful and can do more than normal functions, because the data object or array originally passed to the render function will also be passed to user functions.
+
+This allows them to create content on the fly using other fields from "data" or rendering this or that, depending on some condition. Fields with a user function can therefore be used as a replacement for the non existing if/else constructs in templates.
+
+User functions can exist in the global scope and within an "app" class. In the latter case, an object must be passed to the constructor of the `Builder`.
+
+```
+// call global function 'getArticleCode'
+{{article_code|user:getArticleCode|esc}}
+// call the static method 'listCategories' from the app-class
+{{categories|app::listCategories}}
+// call instance method
+{{colors|app:showColors}}
+```
+
+The `showColors` method for example might look like so:
+
+```php
+class AppView
+{
+    public function showColors($value, $field, $data)
+    {
+        if (empty($value)) {
+            return $this->view->render('no-colors', $data);
+        }
+        return $this->view->render('color-table', $value);
+    }
+}
+
+$view = new AppView;
+
+// The view object can be passed to the builder via constructor
+$builder = new Builder(new ArrayLoader, $view);
+
+// or it can be later set using the setApp method
+$builder->setApp($view);
+```
+
+User functions may also alter the data parameter, for example create new array keys or properties on the fly. Such fields may then be used later on within the same template. Just get the data parameter as a reference:
+
+```php
+function getArticleCode($value, $field, &$data)
+{
+    // create a new new field
+    $data['new_field'] = ...
+    // return article-code
+    return $data['type'] . '-' . $data['category1'];
+}
+```
+
+###### Data object methods
+
+It is also possible to call instance and static methods defined in the data object. These are called without any parameters. However, it is also possibe to use the data object as the app object in the constructor of the `Builder` and then call them using `app:` or `app::`.
+
+```php
+// field definition: {{somefield|data:doubleSomething}}
+class DataObj
+{
+    public function doubleSomething()
+    {
+        return $something * 2;
+    }
+}
+```
+
+###### Built-in methods
+
+Three methods are built-in: `default`, `render` and `each`.
+
+Default inserts the string specified when the value parameter is empty. Options specified after `default` are ignored in this case, so the value must be properly encoded.
+
+`render` and `each` are used to include sub-templates. They are called with the template specified and the value of the field they are attached to. The `render` method can also be called with the same data object or array as the current render method was called with, by specifying a question mark (?) as second parameter. This makes it possible to break up flat data structures in groups and render them with separate sub-templates.
+
+The separator in `each` is optional and defaults to an empty string ('').
+
+The example below shows how to use `each` to render a table in one go. The fields `thead` and `tbody` in the data parameter passed to render are both arrays. The same fields in the template have the `each` option specified which
+calls the `each` method with the content of the fields they belong to.
+
+```php
+$data = [
+  ['name' => 'Bob', 'email' => 'bob@example.com'],
+  ['name' => 'Mary', 'email' => 'mary@example.com'],
+  ['name' => 'Jenny', 'email' => 'jenny@example.com'],
+];
+
+$templates = [
+	'table' => '<table>
+<thead>
+<tr>
+{{thead|each("th", "\n")}}
+</tr>
+</thead>
+<tbody>
+{{tbody|each("tr", "\n")}}
+</tbody>
+</table>',
+	'th' => '<th>{{item|esc}}</th>',
+	'tr' => '<tr>
+<td>{{name|esc}}</td>
+<td><a href="mailto:{{email}}">{{email|esc}}</a></td>
+</tr>'
+];
+
+// render the table
+echo $engine->render(
+	'table',
+	[
+		'thead' => ['Username', 'Email'],
+		'tbody' => $data
+	]
+);
+```
+
 ### Example Code
 
-You will find some (commented) examples in the [examples directory](./examples). The index.php itself is also an example that renders the menu-page. It uses features, like `each` and file based templates. All examples (except index.php) have simple benchmark tests included, giving some hints about rendering times and memory usage.
+There are some (commented) examples in the [examples directory](./examples) and in [benchmark](./benchmark). The latter have simple benchmark tests included, giving some hints about rendering times and memory usage.
 
 Please note that the displayed memory consumption values may have strong variations when compared between different platforms and PHP versions (see discussion on stackoverflow: [PHP memory_get_usage](http://stackoverflow.com/questions/4010781/php-memory-get-usage).
 
 ## License
 
 The MIT [License](./LICENSE).
+
+The testdata used in the benchmark tests, is an extract from the public sample data `medsamp2016.xml`, available from the [U.S. National Library of Medicine](https://www.nlm.nih.gov/bsd/sample_records_avail.html).

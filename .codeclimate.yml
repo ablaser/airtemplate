@@ -1,6 +1,10 @@
 engines:
   duplication:
     enabled: true
+    exclude_fingerprints:
+    - 01f18be6d5b24c175bc1d07ce710c8ca
+    - c3612ef84cdcab022fa842656771a1ea
+    - 1554a0fcc268fd489b81acdb5e4ba7d4
     config:
       languages:
       - php
@@ -14,17 +18,18 @@ engines:
     checks:
       Naming/ShortVariable:
         enabled: false
-    exclude_fingerprints:
-    - 98e8e0201f1eb85992c264b36e8e1204
 ratings:
   paths:
-  - src/**
+  - "src/**"
 exclude_paths:
-- tests/
-- vendor/
-- examples/
-- build/
-- LICENSE
-- **.md
-- **.json
-- **.xml
+- "benchmark/"
+- "build/"
+- "examples/"
+- "tests/"
+- "vendor/"
+- "LICENSE"
+- "**.md"
+- "**.json"
+- "**.lock"
+- "**.xml"
+- "**.yml"

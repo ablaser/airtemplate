@@ -1,0 +1,9 @@
+<div class="rss-channel">
+<h2>{{title|esc}}</h2>
+<p>{{description|esc}}</p>
+<p><a href="{{link}}">{{link|esc}}</a></p>
+<p>{{pubDate|strtotime|strftime("%d.%m.%Y, %H:%M",?)}}</p>
+<ul>
+{{item|each("rss_item")}}
+</ul>
+</div>

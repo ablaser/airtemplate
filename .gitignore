@@ -3,17 +3,16 @@ composer.lock
 /vendor/
 
 # PHPUnit
-phpunit.xml
-phpunit.xml.dist
 /build/
 
-# phpDocumentor
-/output/
-
 # examples
-/examples/cache/
+/benchmark/data/
+/benchmark/temp/
+/examples/data/
 
 # Misc.
 _commands.txt
 _project.txt
 index.html
+AirTemplate.komodoproject
+/.komodotools/

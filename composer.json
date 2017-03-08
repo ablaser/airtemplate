@@ -1,7 +1,7 @@
 {
-    "name": "airtemplate/airtemplate",
+    "name": "airtemplate/air2",
     "description": "A template engine for PHP devs. Lightweight, flexible and easy to use and extend in PHP.",
-    "keywords": ["PHP", "templating", "template", "template engine", "micro-template", "developer"],
+    "keywords": ["PHP", "templating", "template", "template engine", "developer"],
     "type": "library",
     "license": "MIT",
     "authors": [
@@ -10,7 +10,9 @@
         }
     ],
     "require": {
-        "php": ">=5.5.0"
+        "php": ">=5.5.0",
+        "psr/cache": "~1.0",
+        "psr/log": "~1.0"
     },
     "require-dev": {
         "phpunit/phpunit": "4.8.*",
@@ -18,11 +20,15 @@
         "squizlabs/php_codesniffer": "2.*",
         "mikey179/vfsStream": "~1",
         "satooshi/php-coveralls": "^1.0",
-        "codeclimate/php-test-reporter": "dev-master"
+        "codeclimate/php-test-reporter": "dev-master",
+        "michelf/php-markdown": "^1.7",
+        "symfony/cache": "^3.2",
+        "gamez/psr-testlogger": "^1.0"
     },
     "autoload": {
         "psr-4": {
-            "AirTemplate\\": "src/"
+            "AirTemplate\\": "src/",
+            "\\Michelf\\Markdown\\": "vendor/michelf/php-markdown/"
         }
     }
 }

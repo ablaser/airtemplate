@@ -12,7 +12,8 @@ filter:
     paths:
         - "src/*"
     excluded_paths:
+        - "benchmark/"
+        - "build/"
         - "examples/"
         - "tests/"
         - "vendor/"
-        - "tmp/"

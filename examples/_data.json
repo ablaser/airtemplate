@@ -1,0 +1,8 @@
+{
+    "index": {
+        "_layout": "index_page",
+        "title": "AirTemplate Examples",
+        "description": "Example programs showing the use of the AirTemplate templating system.",
+        "copyright": "&copy; 2016 Andreas Blaser"
+    }
+}

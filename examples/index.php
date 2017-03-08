@@ -1,64 +1,22 @@
 <?php
-
     require './lib/bootstrap.php';
+    require '../vendor/michelf/php-markdown/Michelf/Markdown.inc.php';
 
-    use AirTemplate\FileTemplate;
+    use AirTemplate\Builder;
+    use AirTemplate\Loader\FilesystemLoader;
 
-    /**
-     * List examples and wrap it in an article tag.
-     *
-     * @param array|object $example_data  Example data array
-     * @param string       $title         Article title
-     *
-     * @return string      The rendered article
-     */
-    function listExamples($example_data, $title)
-    {
-        global $template;
-        // Build example list
-        // Separate items by a newline char (\n) and
-        // apply htmlspecialchars to the description
-        $example_list = $template->render(
-            'index_list.tmpl',
-            [
-                'item_list' => $template->each(
-                    'index_item.tmpl',
-                    $example_data,
-                    [
-                        'name' => 'htmlspecialchars',
-                        'desc' => 'htmlspecialchars'
-                    ],
-                    n
-                )
-            ]
-        );
-        // Return the list wrapped in an article tag
-        return $template->render(
-            'index_article.tmpl',
-            [
-                'article_title' => htmlspecialchars($title),
-                'article_body' => $example_list
-            ]
-        );
-    }
+    // load page metadata from JSON file
+    $pageData = json_decode(file_get_contents('./_data.json'));
+    // Add markdown content
+    $pageData->index->body = file_get_contents('./index.md');
 
-
-    // load list of examples from JSON file
-    $example_data = json_decode(file_get_contents('./index_data.json'), true);
-
-    // create a global template object and load templates
-    $template = new FileTemplate;
-    $template->loadTemplates('index_*.tmpl', './templates');
+    // create page render engine
+    $builder = new Builder(new FilesystemLoader('./templates/page'));
+    $page = $builder->build('*');
+    $builder = null;
 
     // render the examples menu page
-    echo $template->render(
-        'index_page.tmpl',
-        [
-            'title' => htmlspecialchars('AirTemplate Examples'),
-            'description' => htmlspecialchars('Some examples demonstrating the use of AirTemplate Templates.'),
-            'copyright' => '&copy; 2016 Andreas Blaser',
-            'body' => listExamples($example_data, 'AirTemplate Examples'),
-        ]
+    echo $page->render(
+        $pageData->index->_layout,
+        $pageData->index
     );
-
-?>
